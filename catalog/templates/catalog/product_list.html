@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Список товаров{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h2>Канцелярские товары</h2>
+    </div>
+</div>
+
+{% if role == 'Менеджер' or role == 'Администратор' %}
+<div class="row mb-3">
+    <div class="col-md-4">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="search" class="form-control" placeholder="Поиск..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">Найти</button>
+        </form>
+    </div>
+    <div class="col-md-3">
+        <form method="get">
+            <select name="provider" class="form-select" onchange="this.form.submit()">
+                <option value="">Все поставщики</option>
+                {% for provider_id, provider_name in providers %}
+                <option value="{{ provider_id }}" {% if selected_provider == provider_id|stringformat:"s" %}selected{% endif %}>
+                    {{ provider_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="col-md-3">
+        <form method="get">
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="">Сортировка</option>
+                <option value="stock_asc" {% if selected_sort == 'stock_asc' %}selected{% endif %}>По количеству (возр.)</option>
+                <option value="stock_desc" {% if selected_sort == 'stock_desc' %}selected{% endif %}>По количеству (убыв.)</option>
+            </select>
+        </form>
+    </div>
+    {% if role == 'Администратор' %}
+    <div class="col-md-2">
+        <a href="{% url 'product_create' %}" class="btn btn-success w-100">+ Добавить</a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="row">
+    {% for product in page_obj %}
+    <div class="col-md-4 col-lg-3">
+        <div class="card product-card {% if product.has_large_discount %}discount-highlight{% elif product.is_out_of_stock %}out-of-stock{% endif %}">
+            <img src="/static/{{ product.photo|default:'placeholder.png' }}" class="card-img-top product-img" alt="{{ product.name }}">
+            <div class="card-body">
+                <h6 class="card-title">{{ product.name }}</h6>
+                <p class="card-text small">{{ product.article }}</p>
+                <p class="card-text">
+                    <small class="text-muted">{{ product.category.name }}</small>
+                </p>
+                <div class="mb-2">
+                    {% if product.discount > 0 %}
+                        <span class="price-old">{{ product.price }} ₽</span>
+                        <span class="price-new ms-2">{{ product.get_final_price }} ₽</span>
+                    {% else %}
+                        <span>{{ product.price }} ₽</span>
+                    {% endif %}
+                </div>
+                <p class="card-text small">
+                    На складе: {{ product.amount_in_stock }} {{ product.unit.name }}
+                </p>
+                {% if product.discount > 0 %}
+                <p class="card-text small">
+                    <span class="badge bg-danger">Скидка {{ product.discount }}%</span>
+                </p>
+                {% endif %}
+                <a href="{% url 'product_detail' product.id %}" class="btn btn-sm btn-primary w-100">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">Товары не найдены</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Пагинация -->
+{% if page_obj.has_other_pages %}
+<nav aria-label="Навигация" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page=1&search={{ search_query }}&provider={{ selected_provider }}&sort={{ selected_sort }}">Первая</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}&provider={{ selected_provider }}&sort={{ selected_sort }}">Пред.</a>
+        </li>
+        {% endif %}
+
+        <li class="page-item active">
+            <span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search_query }}&provider={{ selected_provider }}&sort={{ selected_sort }}">След.</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search_query }}&provider={{ selected_provider }}&sort={{ selected_sort }}">Последняя</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
