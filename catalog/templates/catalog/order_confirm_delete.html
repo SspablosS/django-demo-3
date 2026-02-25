@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Удаление заказа{% endblock %}
+
+{% block content %}
+<div class="row mt-3">
+    <div class="col-md-6">
+        <a href="{% url 'order_list' %}" class="btn btn-secondary mb-3">← Назад</a>
+        
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4>Удаление заказа</h4>
+            </div>
+            <div class="card-body">
+                <p>Вы действительно хотите удалить заказ?</p>
+                <h5>Заказ #{{ order.id }} от {{ order.date_creation|date:"d.m.Y" }}</h5>
+                <p class="text-muted">Клиент: {{ order.user.get_full_name }}</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'order_list' %}" class="btn btn-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

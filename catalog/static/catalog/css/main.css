@@ -1,0 +1,139 @@
+body {
+    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.header {
+    background-color: #343a40;
+    color: white;
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header a {
+    color: white;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.header a:hover {
+    opacity: 0.9;
+}
+
+.header .user-info {
+    text-align: right;
+}
+
+.product-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 1rem;
+    height: 100%;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.product-img {
+    height: 200px;
+    object-fit: cover;
+    width: 100%;
+    background-color: #e9ecef;
+}
+
+.price-old {
+    text-decoration: line-through;
+    color: #dc3545;
+    font-size: 0.9em;
+}
+
+.price-new {
+    color: #000;
+    font-weight: bold;
+}
+
+.discount-highlight {
+    background-color: #2E8B57 !important;
+    color: white;
+}
+
+.discount-highlight .card-text,
+.discount-highlight .text-muted {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+.out-of-stock {
+    background-color: #87CEEB !important;
+}
+
+.out-of-stock .card-text,
+.out-of-stock .text-muted {
+    color: #000 !important;
+}
+
+.sidebar {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.messages {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 300px;
+}
+
+.table-responsive {
+    background-color: white;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1rem;
+}
+
+.action-buttons .btn {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+
+.form-section {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+}
+
+.form-section h5 {
+    margin-bottom: 1rem;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.status-badge {
+    font-size: 0.85em;
+    padding: 0.35em 0.65em;
+}
+
+@media (max-width: 768px) {
+    .header .container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .header .user-info {
+        text-align: left;
+    }
+    
+    .messages {
+        left: 20px;
+        right: 20px;
+        min-width: auto;
+    }
+}

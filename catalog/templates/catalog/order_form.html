@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row mt-3">
+    <div class="col-md-10">
+        <a href="{% url 'order_list' %}" class="btn btn-secondary mb-3">← Назад к списку</a>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4>{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" id="orderForm" onsubmit="return validateOrderForm()">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.user.id_for_label }}" class="form-label">Клиент *</label>
+                            {{ form.user }}
+                            {% if form.user.errors %}
+                                <div class="text-danger small">{{ form.user.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.pick_up_point.id_for_label }}" class="form-label">Пункт выдачи *</label>
+                            {{ form.pick_up_point }}
+                            {% if form.pick_up_point.errors %}
+                                <div class="text-danger small">{{ form.pick_up_point.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.date_delivery.id_for_label }}" class="form-label">Дата доставки *</label>
+                            {{ form.date_delivery }}
+                            {% if form.date_delivery.errors %}
+                                <div class="text-danger small">{{ form.date_delivery.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.status.id_for_label }}" class="form-label">Статус *</label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="text-danger small">{{ form.status.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.receipt_code.id_for_label }}" class="form-label">Код получения *</label>
+                            {{ form.receipt_code }}
+                            {% if form.receipt_code.errors %}
+                                <div class="text-danger small">{{ form.receipt_code.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h5>Товары в заказе</h5>
+                    <div id="products-container">
+                        <div class="product-item row mb-2">
+                            <div class="col-md-8">
+                                <select name="product_id" class="form-control">
+                                    <option value="">Выберите товар</option>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}" data-price="{{ product.get_final_price }}" data-stock="{{ product.amount_in_stock }}">
+                                        {{ product.name }} (на складе: {{ product.amount_in_stock }} {{ product.unit.name }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" name="amount" class="form-control" placeholder="Кол-во" min="1" value="1">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(this)">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success btn-sm mb-3" onclick="addProduct()">+ Добавить товар</button>
+                    
+                    <div class="alert alert-info">
+                        <strong>Общая сумма: </strong><span id="total-amount">0</span> ₽
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'order_list' %}" class="btn btn-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Переопределяем функцию addProduct для конкретного шаблона
+const productOptionsHTML = `
+    {% for product in products %}
+    <option value="{{ product.id }}" data-price="{{ product.get_final_price }}" data-stock="{{ product.amount_in_stock }}">
+        {{ product.name }} (на складе: {{ product.amount_in_stock }} {{ product.unit.name }})
+    </option>
+    {% endfor %}
+`;
+
+function addProduct() {
+    const container = document.getElementById('products-container');
+    const newRow = document.createElement('div');
+    newRow.className = 'product-item row mb-2';
+    newRow.innerHTML = `
+        <div class="col-md-8">
+            <select name="product_id" class="form-control">
+                <option value="">Выберите товар</option>
+                ${productOptionsHTML}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input type="number" name="amount" class="form-control" placeholder="Кол-во" min="1" value="1">
+        </div>
+        <div class="col-md-1">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(this)">×</button>
+        </div>
+    `;
+    container.appendChild(newRow);
+}
+</script>
+{% endblock %}

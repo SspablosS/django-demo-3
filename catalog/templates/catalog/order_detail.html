@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load math_filters %}
+
+{% block title %}Заказ #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="row mt-3">
+    <div class="col-md-8">
+        <a href="{% url 'order_list' %}" class="btn btn-secondary mb-3">← Назад к списку</a>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4>Заказ #{{ order.id }} от {{ order.date_creation|date:"d.m.Y" }}</h4>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tr>
+                        <th>Клиент:</th>
+                        <td>{{ order.user.get_full_name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Статус:</th>
+                        <td>
+                            <span class="badge {% if order.status.name == 'Доставлен' %}bg-success{% elif order.status.name == 'Отменен' %}bg-secondary{% elif order.status.name == 'В пути' %}bg-info{% else %}bg-warning{% endif %}">
+                                {{ order.status.name }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Пункт выдачи:</th>
+                        <td>{{ order.pick_up_point.city }}, {{ order.pick_up_point.street }}, д. {{ order.pick_up_point.building }}</td>
+                    </tr>
+                    <tr>
+                        <th>Дата доставки:</th>
+                        <td>{{ order.date_delivery|date:"d.m.Y" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Код получения:</th>
+                        <td><strong>{{ order.receipt_code }}</strong></td>
+                    </tr>
+                </table>
+                
+                <h5 class="mt-4">Состав заказа</h5>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Артикул</th>
+                            <th>Цена</th>
+                            <th>Количество</th>
+                            <th>Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.product.article }}</td>
+                            <td>
+                                {% if item.product.discount > 0 %}
+                                    <span class="text-decoration-line-through text-muted">{{ item.product.price }} ₽</span>
+                                    <strong>{{ item.product.get_final_price }} ₽</strong>
+                                {% else %}
+                                    {{ item.product.price }} ₽
+                                {% endif %}
+                            </td>
+                            <td>{{ item.amount }} {{ item.product.unit.name }}</td>
+                            <td><strong>{{ item.product.get_final_price|multiply:item.amount }} ₽</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-end">Итого:</th>
+                            <th><strong>{{ total_amount }} ₽</strong></th>
+                        </tr>
+                    </tfoot>
+                </table>
+                
+                {% if role == 'Администратор' %}
+                <div class="mt-3">
+                    <a href="{% url 'order_edit' order.id %}" class="btn btn-primary">Редактировать</a>
+                    <a href="{% url 'order_delete' order.id %}" class="btn btn-danger">Удалить</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

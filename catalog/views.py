@@ -3,8 +3,9 @@ from django.contrib.auth.hashers import check_password
 from django.db.models import Q
 from django.contrib import messages
 from django.core.paginator import Paginator
-from .models import User, Role, Product, Order, ProductInOrder
-from .forms import LoginForm, ProductForm
+import datetime
+from .models import User, Role, Product, Order, ProductInOrder, OrderStatus
+from .forms import LoginForm, ProductForm, OrderForm
 
 
 def get_user_role(request):
@@ -220,22 +221,258 @@ def product_delete(request, product_id):
 def order_list(request):
     """Список заказов (менеджер и администратор)"""
     role = get_user_role(request)
-    
+
     if role not in ['Менеджер', 'Администратор']:
         messages.error(request, 'Доступ запрещён.')
         return redirect('product_list')
-    
+
     orders = Order.objects.select_related(
         'pick_up_point', 'user', 'status'
     ).prefetch_related('productinorder_set__product').all()
-    
+
+    # Фильтрация по статусу (для менеджера и администратора)
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        orders = orders.filter(status_id=status_filter)
+
+    # Поиск по номеру заказа и ФИО клиента
+    search_query = request.GET.get('search', '')
+    if search_query:
+        orders = orders.filter(
+            Q(id__icontains=search_query) |
+            Q(user__surname__icontains=search_query) |
+            Q(user__name__icontains=search_query) |
+            Q(user__patronymic__icontains=search_query)
+        )
+
+    # Получаем список статусов для фильтра
+    statuses = OrderStatus.objects.all()
+
     context = {
         'orders': orders,
         'role': role,
         'current_user': request.current_user,
+        'statuses': statuses,
+        'selected_status': status_filter,
+        'search_query': search_query,
+    }
+
+    return render(request, 'catalog/order_list.html', context)
+
+
+def order_detail(request, order_id):
+    """Детальный просмотр заказа"""
+    role = get_user_role(request)
+
+    if role not in ['Менеджер', 'Администратор']:
+        messages.error(request, 'Доступ запрещён.')
+        return redirect('product_list')
+
+    order = get_object_or_404(
+        Order.objects.select_related('pick_up_point', 'user', 'status'),
+        id=order_id
+    )
+    order_items = ProductInOrder.objects.filter(order=order).select_related('product')
+
+    # Расчёт общей суммы
+    total_amount = sum(item.product.get_final_price() * item.amount for item in order_items)
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'total_amount': total_amount,
+        'role': role,
+        'current_user': request.current_user,
+    }
+
+    return render(request, 'catalog/order_detail.html', context)
+
+
+def order_create(request):
+    """Создание заказа (только администратор)"""
+    role = get_user_role(request)
+
+    if role != 'Администратор':
+        messages.error(request, 'Доступ запрещён. Только администратор может создавать заказы.')
+        return redirect('order_list')
+
+    if request.method == 'POST':
+        form = OrderForm(request.POST)
+        if form.is_valid():
+            order = form.save(commit=False)
+            order.date_creation = datetime.date.today()
+            
+            # Получаем товары из сессии или POST
+            product_ids = request.POST.getlist('product_id')
+            amounts = request.POST.getlist('amount')
+            
+            if not product_ids:
+                messages.error(request, 'Необходимо выбрать хотя бы один товар')
+                return render(request, 'catalog/order_form.html', {'form': form, 'role': role, 'current_user': request.current_user, 'title': 'Создать заказ', 'products': Product.objects.all()})
+            
+            # Проверка количества товаров на складе
+            for pid, amt in zip(product_ids, amounts):
+                if pid and amt:
+                    product = Product.objects.get(id=int(pid))
+                    if int(amt) > product.amount_in_stock:
+                        messages.error(request, f'Товар "{product.name}" недоступен в количестве {amt} шт. (на складе: {product.amount_in_stock})')
+                        return render(request, 'catalog/order_form.html', {'form': form, 'role': role, 'current_user': request.current_user, 'title': 'Создать заказ', 'products': Product.objects.all()})
+            
+            order.save()
+            
+            # Добавляем товары в заказ
+            for pid, amt in zip(product_ids, amounts):
+                if pid and amt:
+                    product = Product.objects.get(id=int(pid))
+                    ProductInOrder.objects.create(order=order, product=product, amount=int(amt))
+                    # Резервируем товар (уменьшаем количество на складе)
+                    product.amount_in_stock -= int(amt)
+                    product.save()
+            
+            messages.success(request, f'Заказ #{order.id} успешно создан.')
+            return redirect('order_list')
+        else:
+            messages.error(request, 'Ошибка при создании заказа. Проверьте данные.')
+    else:
+        form = OrderForm(initial={'date_delivery': datetime.date.today()})
+    
+    context = {
+        'form': form,
+        'role': role,
+        'current_user': request.current_user,
+        'title': 'Создать заказ',
+        'products': Product.objects.all(),
     }
     
-    return render(request, 'catalog/order_list.html', context)
+    return render(request, 'catalog/order_form.html', context)
+
+
+def order_edit(request, order_id):
+    """Редактирование заказа (только администратор)"""
+    role = get_user_role(request)
+
+    if role != 'Администратор':
+        messages.error(request, 'Доступ запрещён. Только администратор может редактировать заказы.')
+        return redirect('order_list')
+
+    order = get_object_or_404(Order, id=order_id)
+    
+    if request.method == 'POST':
+        form = OrderForm(request.POST, instance=order)
+        if form.is_valid():
+            order = form.save(commit=False)
+            
+            # Получаем товары из POST
+            product_ids = request.POST.getlist('product_id')
+            amounts = request.POST.getlist('amount')
+            
+            # Удаляем старые товары из заказа (возвращаем на склад)
+            old_items = ProductInOrder.objects.filter(order=order)
+            for item in old_items:
+                item.product.amount_in_stock += item.amount
+                item.product.save()
+            old_items.delete()
+            
+            # Добавляем новые товары
+            for pid, amt in zip(product_ids, amounts):
+                if pid and amt:
+                    product = Product.objects.get(id=int(pid))
+                    if int(amt) > product.amount_in_stock:
+                        messages.error(request, f'Товар "{product.name}" недоступен в количестве {amt} шт.')
+                        return redirect('order_edit', order_id=order_id)
+                    ProductInOrder.objects.create(order=order, product=product, amount=int(amt))
+                    product.amount_in_stock -= int(amt)
+                    product.save()
+            
+            order.save()
+            messages.success(request, f'Заказ #{order.id} успешно обновлён.')
+            return redirect('order_list')
+        else:
+            messages.error(request, 'Ошибка при обновлении заказа.')
+    else:
+        form = OrderForm(instance=order)
+    
+    order_items = ProductInOrder.objects.filter(order=order)
+    
+    context = {
+        'form': form,
+        'role': role,
+        'current_user': request.current_user,
+        'title': 'Редактировать заказ',
+        'order': order,
+        'order_items': order_items,
+        'products': Product.objects.all(),
+    }
+    
+    return render(request, 'catalog/order_form.html', context)
+
+
+def order_delete(request, order_id):
+    """Удаление заказа (только администратор)"""
+    role = get_user_role(request)
+
+    if role != 'Администратор':
+        messages.error(request, 'Доступ запрещён.')
+        return redirect('order_list')
+
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Проверка статуса — нельзя удалить доставленный заказ
+    if order.status.name == 'Доставлен':
+        messages.error(request, 'Нельзя удалить доставленный заказ.')
+        return redirect('order_list')
+    
+    if request.method == 'POST':
+        # Возвращаем товары на склад
+        order_items = ProductInOrder.objects.filter(order=order)
+        for item in order_items:
+            item.product.amount_in_stock += item.amount
+            item.product.save()
+        order_items.delete()
+        
+        order_id = order.id
+        order.delete()
+        messages.success(request, f'Заказ #{order_id} успешно удалён.')
+        return redirect('order_list')
+    
+    context = {
+        'order': order,
+        'role': role,
+        'current_user': request.current_user,
+    }
+    
+    return render(request, 'catalog/order_confirm_delete.html', context)
+
+
+def order_change_status(request, order_id, status_id):
+    """Изменение статуса заказа"""
+    role = get_user_role(request)
+
+    if role not in ['Менеджер', 'Администратор']:
+        messages.error(request, 'Доступ запрещён.')
+        return redirect('order_list')
+
+    order = get_object_or_404(Order, id=order_id)
+    new_status = get_object_or_404(OrderStatus, id=status_id)
+    
+    old_status = order.status.name
+    
+    # Если статус меняется на "Доставлен" — списываем товары
+    if new_status.name == 'Доставлен' and old_status != 'Доставлен':
+        # Товары уже зарезервированы, просто подтверждаем
+        pass
+    # Если статус меняется на "Отменен" — возвращаем товары
+    elif new_status.name == 'Отменен' and old_status != 'Отменен':
+        order_items = ProductInOrder.objects.filter(order=order)
+        for item in order_items:
+            item.product.amount_in_stock += item.amount
+            item.product.save()
+    
+    order.status = new_status
+    order.save()
+    
+    messages.success(request, f'Статус заказа #{order.id} изменён на "{new_status.name}".')
+    return redirect('order_list')
 
 
 def middleware(get_response):
